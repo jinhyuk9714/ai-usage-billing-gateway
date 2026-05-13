@@ -13,6 +13,10 @@ java {
     }
 }
 
+springBoot {
+    mainClass = "io.github.sungjh.aiusagebillinggateway.AiUsageBillingGatewayApplication"
+}
+
 configurations {
     compileOnly {
         extendsFrom(configurations.annotationProcessor.get())

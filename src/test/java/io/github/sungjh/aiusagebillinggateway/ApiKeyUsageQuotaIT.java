@@ -108,6 +108,41 @@ class ApiKeyUsageQuotaIT extends IntegrationTestSupport {
     }
 
     @Test
+    void usageIdempotencyRejectsSameKeyWithDifferentOccurredAt() throws Exception {
+        String token = signup("owner-occurred@example.com");
+        UUID organizationId = createOrganization(token, "Usage Occurred Org");
+        String rawKey = createApiKey(token, organizationId, "primary");
+
+        mockMvc.perform(post("/api/usage/events")
+                        .header("X-API-Key", rawKey)
+                        .header("Idempotency-Key", "usage-occurred-at")
+                        .contentType(APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "metric":"REQUEST",
+                                  "quantity":1,
+                                  "occurredAt":"2026-05-01T00:00:00Z",
+                                  "metadata":{"route":"mock"}
+                                }
+                                """))
+                .andExpect(status().isCreated());
+
+        mockMvc.perform(post("/api/usage/events")
+                        .header("X-API-Key", rawKey)
+                        .header("Idempotency-Key", "usage-occurred-at")
+                        .contentType(APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "metric":"REQUEST",
+                                  "quantity":1,
+                                  "occurredAt":"2026-05-02T00:00:00Z",
+                                  "metadata":{"route":"mock"}
+                                }
+                                """))
+                .andExpect(status().isConflict());
+    }
+
+    @Test
     void invalidUsageQuantityIsRejected() throws Exception {
         String token = signup("owner@example.com");
         UUID organizationId = createOrganization(token, "Invalid Usage Org");

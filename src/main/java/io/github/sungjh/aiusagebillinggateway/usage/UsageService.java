@@ -9,6 +9,7 @@ import io.github.sungjh.aiusagebillinggateway.observability.MetricsService;
 import io.github.sungjh.aiusagebillinggateway.repository.UsageEventRepository;
 import io.github.sungjh.aiusagebillinggateway.security.AuthenticatedApiKey;
 import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -98,10 +99,12 @@ public class UsageService {
 
     private String requestHash(UsageEventRequest request) {
         try {
-            return Hashing.sha256Hex(objectMapper.writeValueAsString(Map.of(
-                    "metric", request.metric(),
-                    "quantity", request.quantity(),
-                    "metadata", metadataString(request.metadata()))));
+            Map<String, Object> hashInput = new LinkedHashMap<>();
+            hashInput.put("metric", request.metric());
+            hashInput.put("quantity", request.quantity());
+            hashInput.put("occurredAt", request.occurredAt());
+            hashInput.put("metadata", metadataString(request.metadata()));
+            return Hashing.sha256Hex(objectMapper.writeValueAsString(hashInput));
         } catch (Exception exception) {
             throw new IllegalStateException("Failed to hash usage event request", exception);
         }

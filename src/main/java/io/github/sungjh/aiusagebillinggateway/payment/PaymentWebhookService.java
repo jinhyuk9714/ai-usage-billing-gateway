@@ -12,7 +12,9 @@ import io.github.sungjh.aiusagebillinggateway.observability.MetricsService;
 import io.github.sungjh.aiusagebillinggateway.repository.InvoiceRepository;
 import io.github.sungjh.aiusagebillinggateway.repository.PaymentRepository;
 import io.github.sungjh.aiusagebillinggateway.repository.PaymentWebhookEventRepository;
+import java.time.Instant;
 import java.util.Map;
+import java.util.UUID;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -58,14 +60,29 @@ public class PaymentWebhookService {
         String payloadHash = Hashing.sha256Hex(body);
         return webhookEventRepository.findByProviderEventId(request.providerEventId())
                 .map(existing -> duplicateOrConflict(existing, payloadHash))
-                .orElseGet(() -> processNew(request, payloadHash));
+                .orElseGet(() -> processNewWithRaceFallback(request, payloadHash));
     }
 
-    private PaymentWebhookResponse processNew(PaymentWebhookRequest request, String payloadHash) {
-        webhookEventRepository.save(new PaymentWebhookEvent(
+    private PaymentWebhookResponse processNewWithRaceFallback(
+            PaymentWebhookRequest request,
+            String payloadHash) {
+        int inserted = webhookEventRepository.insertIfAbsent(
+                UUID.randomUUID(),
                 request.providerEventId(),
                 request.type(),
-                payloadHash));
+                payloadHash,
+                Instant.now());
+        if (inserted == 0) {
+            return webhookEventRepository.findByProviderEventId(request.providerEventId())
+                    .map(existing -> duplicateOrConflict(existing, payloadHash))
+                    .orElseThrow(() -> new ResponseStatusException(
+                            HttpStatus.CONFLICT,
+                            "Provider event id is already being processed"));
+        }
+        return processNew(request);
+    }
+
+    private PaymentWebhookResponse processNew(PaymentWebhookRequest request) {
         if (!request.type().equals("payment.succeeded")
                 && !request.type().equals("payment.failed")
                 && !request.type().equals("payment.refunded")) {
