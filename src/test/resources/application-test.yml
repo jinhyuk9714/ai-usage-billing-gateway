@@ -1,0 +1,27 @@
+spring:
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+  sql:
+    init:
+      mode: never
+  flyway:
+    enabled: true
+
+security:
+  jwt:
+    secret: test-jwt-secret-with-enough-length-for-hmac-signing
+    ttl-seconds: 3600
+
+payment:
+  webhook-secret: test-webhook-secret
+
+gateway:
+  rate-limit-per-minute: 2
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,metrics

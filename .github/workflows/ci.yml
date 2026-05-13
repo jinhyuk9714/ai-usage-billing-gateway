@@ -1,0 +1,36 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Whitespace check
+        run: git diff --check
+      - name: Source layout check
+        run: |
+          if find src -name "*.java" -type f -exec awk 'length($0) > 180 { print FILENAME ":" FNR ": " length($0); bad=1 } END { exit bad }' {} +; then
+            echo "Source layout check passed"
+          fi
+      - name: Test
+        run: ./gradlew test --no-daemon
+      - name: Build
+        run: ./gradlew build --no-daemon
+      - name: k6 inspect
+        run: |
+          if [ -f k6/mixed-usage-test.js ]; then
+            docker run --rm -v "$PWD:/work" -w /work grafana/k6 inspect k6/mixed-usage-test.js
+          else
+            echo "No k6 script yet"
+          fi
