@@ -77,4 +77,16 @@ public class LedgerEntry {
         this.idempotencyKey = idempotencyKey;
         this.createdAt = Instant.now();
     }
+
+    public LedgerDirection getDirection() {
+        return direction;
+    }
+
+    public long getAmountMinor() {
+        return amountMinor;
+    }
+
+    public String getCurrency() {
+        return currency;
+    }
 }

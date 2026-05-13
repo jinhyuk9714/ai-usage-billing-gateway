@@ -9,6 +9,8 @@ import io.github.sungjh.aiusagebillinggateway.observability.MetricsService;
 import io.github.sungjh.aiusagebillinggateway.repository.LedgerEntryRepository;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -102,6 +104,28 @@ public class LedgerService {
     }
 
     private void appendBalanced(List<LedgerEntry> entries) {
+        long debit = entries.stream()
+                .filter(entry -> entry.getDirection() == LedgerDirection.DEBIT)
+                .mapToLong(LedgerEntry::getAmountMinor)
+                .sum();
+        long credit = entries.stream()
+                .filter(entry -> entry.getDirection() == LedgerDirection.CREDIT)
+                .mapToLong(LedgerEntry::getAmountMinor)
+                .sum();
+        if (debit != credit) {
+            throw new IllegalStateException("Unbalanced ledger entries");
+        }
+        Set<String> currencies = entries.stream()
+                .map(LedgerEntry::getCurrency)
+                .collect(Collectors.toSet());
+        if (currencies.size() != 1) {
+            throw new IllegalStateException("Ledger entry group must use a single currency");
+        }
+        boolean hasNonPositiveAmount = entries.stream()
+                .anyMatch(entry -> entry.getAmountMinor() <= 0);
+        if (hasNonPositiveAmount) {
+            throw new IllegalStateException("Ledger entry amounts must be positive");
+        }
         for (LedgerEntry entry : entries) {
             ledgerEntryRepository.save(entry);
             metricsService.ledgerEntryCreated();

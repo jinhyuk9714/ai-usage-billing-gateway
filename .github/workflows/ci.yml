@@ -20,9 +20,32 @@ jobs:
         run: git diff --check
       - name: Source layout check
         run: |
-          if find src -name "*.java" -type f -exec awk 'length($0) > 180 { print FILENAME ":" FNR ": " length($0); bad=1 } END { exit bad }' {} +; then
-            echo "Source layout check passed"
-          fi
+          python3 - <<'PY'
+          from pathlib import Path
+
+          targets = list(Path("src").rglob("*.java")) + list(Path(".github").rglob("*.yml"))
+          bad = []
+          bidi_chars = "\u202a\u202b\u202c\u202d\u202e\u2066\u2067\u2068\u2069"
+
+          for path in targets:
+              text = path.read_text(encoding="utf-8", errors="ignore")
+              lines = text.splitlines()
+              if len(lines) <= 3:
+                  bad.append(f"{path}: collapsed file with {len(lines)} lines")
+              for index, line in enumerate(lines, start=1):
+                  if len(line) > 180:
+                      bad.append(f"{path}:{index}: line length {len(line)}")
+                  if any(char in line for char in bidi_chars):
+                      bad.append(f"{path}:{index}: hidden bidi unicode character")
+
+          if bad:
+              print("Source layout issues:")
+              for issue in bad:
+                  print(issue)
+              raise SystemExit(1)
+
+          print(f"OK: checked {len(targets)} files")
+          PY
       - name: Test
         run: ./gradlew test --no-daemon
       - name: Build
